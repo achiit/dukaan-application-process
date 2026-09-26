@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ampl — The Application Process</title>
+<meta name="description" content="What happens when a renter applies: the flow, the conversation it opens, what the owner may see, and the pressure test behind each decision.">
+<style>
+  /* Self-contained and system-font only, like the other docs in this folder:
+     a document that has to open from a filesystem or an email attachment
+     cannot depend on a font CDN. */
+  :root {
+    --ground:#ffffff; --surface:#faf8f7; --sunk:#f3efec;
+    --ink:#171310; --ink-2:#6e635d; --ink-3:#9a8f88;
+    --line:#e8e2de; --line-2:#d8d0ca;
+    --accent:#ff481e; --accent-soft:#fff1ed;
+    --good:#2f7d5c; --good-soft:#eaf5f0;
+    --warn:#b25a12; --warn-soft:#fdf1e5;
+    --bad:#b3261e; --bad-soft:#fdecea;
+    --shadow:0 1px 2px rgba(23,19,16,.05), 0 10px 30px rgba(23,19,16,.05);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --rail:230px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#100d0b; --surface:#181411; --sunk:#201a16;
+      --ink:#f5f0ec; --ink-2:#a2968e; --ink-3:#7b716a;
+      --line:#2a2320; --line-2:#3a312c;
+      --accent:#ff6440; --accent-soft:#2d1710;
+      --good:#5fb98d; --good-soft:#13241c;
+      --warn:#e08a3c; --warn-soft:#2a1d0f;
+      --bad:#e8695f; --bad-soft:#2b1513;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--sans); font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased; }
+  .shell { max-width:1240px; margin:0 auto; padding:48px 26px 120px; display:flex; gap:44px; align-items:flex-start; }
+  .doc { min-width:0; flex:1; display:flex; flex-direction:column; gap:46px; }
+
+  nav.toc { position:sticky; top:28px; width:var(--rail); flex:0 0 var(--rail); font-size:13px; }
+  nav.toc .lbl { font-family:var(--mono); font-size:10.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin-bottom:10px; }
+  nav.toc ol { list-style:none; margin:0 0 18px; padding:0; display:flex; flex-direction:column; gap:2px; }
+  nav.toc a { display:block; padding:3px 9px; border-left:2px solid var(--line); color:var(--ink-2); text-decoration:none; }
+  nav.toc a:hover { color:var(--ink); border-left-color:var(--accent); background:var(--surface); }
+
+  header.mast { display:flex; flex-direction:column; gap:14px; }
+  .eyebrow { font-family:var(--mono); font-size:11.5px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); }
+  h1 { margin:0; font-size:clamp(32px,4.8vw,46px); font-weight:700; letter-spacing:-.04em; line-height:1.06; }
+  .standfirst { margin:0; max-width:64ch; font-size:18.5px; line-height:1.55; color:var(--ink-2); }
+  .meta { display:flex; flex-wrap:wrap; gap:6px 20px; font-family:var(--mono); font-size:11.5px; color:var(--ink-3); padding-top:4px; }
+
+  .part { border:1px solid var(--line); border-radius:15px; padding:22px 24px; background:var(--surface); box-shadow:var(--shadow); display:flex; flex-direction:column; gap:7px; }
+  .part .tag { font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); }
+  .part h2 { margin:0; font-size:clamp(24px,3.2vw,30px); font-weight:700; letter-spacing:-.035em; line-height:1.14; }
+  .part p { margin:0; color:var(--ink-2); max-width:70ch; }
+
+  section { display:flex; flex-direction:column; gap:16px; scroll-margin-top:24px; }
+  h3 { margin:0; font-size:21px; font-weight:650; letter-spacing:-.02em; line-height:1.25; }
+  h4 { margin:0; font-size:16px; font-weight:650; letter-spacing:-.01em; }
+  p, li { max-width:72ch; }
+  p { margin:0; }
+  ul, ol { margin:0; padding-left:22px; display:flex; flex-direction:column; gap:7px; }
+  code { font-family:var(--mono); font-size:.88em; background:var(--sunk); padding:1.5px 5px; border-radius:5px; }
+  strong { font-weight:650; }
+
+  table { border-collapse:collapse; width:100%; font-size:14.5px; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); border-bottom-color:var(--line-2); }
+  td code { font-size:.86em; }
+  .wrap { overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+  .wrap table { min-width:560px; }
+  .wrap th:first-child, .wrap td:first-child { padding-left:16px; }
+  .wrap tr:last-child td { border-bottom:none; }
+
+  .note { border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:0 11px 11px 0; padding:14px 17px; background:var(--surface); display:flex; flex-direction:column; gap:8px; }
+  .note.good { border-left-color:var(--good); background:var(--good-soft); }
+  .note.warn { border-left-color:var(--warn); background:var(--warn-soft); }
+  .note.bad  { border-left-color:var(--bad);  background:var(--bad-soft); }
+  .note .h { font-family:var(--mono); font-size:10.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); }
+
+  .pill { display:inline-block; font-family:var(--mono); font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; padding:2px 8px; border-radius:99px; border:1px solid var(--line-2); color:var(--ink-2); white-space:nowrap; }
+  .pill.now  { background:var(--bad-soft);  border-color:transparent; color:var(--bad); }
+  .pill.fix  { background:var(--good-soft); border-color:transparent; color:var(--good); }
+  .pill.open { background:var(--warn-soft); border-color:transparent; color:var(--warn); }
+
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(248px,1fr)); gap:14px; }
+  .card { border:1px solid var(--line); border-radius:13px; padding:15px 17px; background:var(--surface); display:flex; flex-direction:column; gap:7px; }
+  .card .n { font-family:var(--mono); font-size:11px; font-weight:600; color:var(--accent); letter-spacing:.08em; }
+  .card p { font-size:14.5px; color:var(--ink-2); }
+
+  .flow { display:flex; flex-direction:column; gap:0; border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--surface); }
+  .step { display:grid; grid-template-columns:34px 1fr; gap:14px; padding:15px 18px; border-bottom:1px solid var(--line); }
+  .step:last-child { border-bottom:none; }
+  .step .num { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--accent); padding-top:2px; }
+  .step .body { display:flex; flex-direction:column; gap:5px; min-width:0; }
+  .step .who { font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); }
+  .step p { font-size:14.5px; color:var(--ink-2); }
+
+  .pt { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--surface); }
+  .pt > div { padding:15px 18px; border-bottom:1px solid var(--line); display:flex; flex-direction:column; gap:8px; }
+  .pt > div:last-child { border-bottom:none; }
+  .pt .q { font-weight:650; font-size:15.5px; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  .pt .a { font-size:14.5px; color:var(--ink-2); }
+  .pt .v { font-size:14.5px; }
+  .pt .v b { color:var(--ink); }
+
+  hr { border:none; border-top:1px solid var(--line); margin:0; }
+  footer { color:var(--ink-3); font-size:13.5px; font-family:var(--mono); }
+
+  @media (max-width:980px) { nav.toc { display:none; } .shell { padding:32px 20px 90px; } }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<nav class="toc">
+  <div class="lbl">Contents</div>
+  <ol>
+    <li><a href="#today">0 · Where we are today</a></li>
+    <li><a href="#reference">1 · The reference, and the divergence</a></li>
+    <li><a href="#process">2 · The process</a></li>
+    <li><a href="#thread">3 · The conversation</a></li>
+    <li><a href="#owner-sees">4 · What the owner may see</a></li>
+    <li><a href="#pressure">5 · The pressure test</a></li>
+    <li><a href="#schema">6 · Schema &amp; API</a></li>
+    <li><a href="#open">7 · Open decisions</a></li>
+  </ol>
+</nav>
+
+<main class="doc">
+
+<header class="mast">
+  <div class="eyebrow">Ampl · Product specification</div>
+  <h1>The application process</h1>
+  <p class="standfirst">
+    What happens between a renter pressing <em>Apply</em> and an owner saying yes — the
+    conversation it opens, the facts it carries, the facts it must refuse to carry, and
+    the failure each decision was tested against.
+  </p>
+  <div class="meta">
+    <span>Status: proposal</span>
+    <span>Audience: product, backend, renter &amp; owner front-ends</span>
+    <span>Companion: <code>docs/onboarding-handoff.html</code></span>
+  </div>
+</header>
+
+<!-- ───────────────────────────────────────────────────────────── PART 0 -->
+<div class="part">
+  <div class="tag">Part zero</div>
+  <h2>Where we are today</h2>
+  <p>
+    Six findings from reading the code rather than the roadmap. The first one decides how
+    much of the rest is a change and how much is a build.
+  </p>
+</div>
+
+<section id="today">
+  <h3>The audit</h3>
+
+  <div class="note bad">
+    <div class="h">Finding 1 — the most important one</div>
+    <p>
+      <strong>The renter app never submits an application.</strong> In
+      <code>apply-view.tsx</code> the handler is <code>const send = () =&gt; setSent(true)</code>.
+      It flips a local boolean and renders the success screen. Nothing reaches the server.
+      The same is true of the mobile path in <code>listing-detail.tsx</code>.
+    </p>
+    <p>
+      So every renter who has "applied" on Ampl has applied to nothing, and every owner
+      who has seen an empty applications list was reading the truth. This is not a bug to
+      patch at the end — it means the flow below is being built, not repaired, and we get
+      to choose the shape rather than inherit it.
+    </p>
+  </div>
+
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Finding</th><th>Evidence</th><th>Consequence</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pill now">Now</span></td>
+          <td>Apply button is inert</td>
+          <td><code>apply-view.tsx:62</code></td>
+          <td>No application has ever been created from the renter app</td>
+        </tr>
+        <tr>
+          <td><span class="pill now">Now</span></td>
+          <td>Conversation opens on <em>approval</em>, not on apply</td>
+          <td><code>applications.py:253</code></td>
+          <td>An owner cannot ask a question before deciding — the one moment they need to</td>
+        </tr>
+        <tr>
+          <td><span class="pill now">Now</span></td>
+          <td><code>match_percentage</code> is hardcoded to <code>85</code></td>
+          <td><code>applications.py:81</code></td>
+          <td>Owners rank applicants by a number we invented. Same class of error as a seeded score shown as a measurement</td>
+        </tr>
+        <tr>
+          <td><span class="pill now">Now</span></td>
+          <td><code>Conversation.dm_key</code> is unique per <em>pair of users</em></td>
+          <td><code>messaging.py:25</code></td>
+          <td>A renter applying to two homes from one owner shares a single thread. The schema forbids per-property threads</td>
+        </tr>
+        <tr>
+          <td><span class="pill now">Now</span></td>
+          <td>No <code>viewed_at</code>, <code>withdrawn</code> or <code>expired</code></td>
+          <td><code>models/application.py</code></td>
+          <td>The renter app invents a <code>not-reviewed</code> status client-side because the server cannot say whether anyone looked</td>
+        </tr>
+        <tr>
+          <td><span class="pill now">Now</span></td>
+          <td>Applying requires a <code>TenantProfile</code> that the renter app never creates</td>
+          <td><code>applications.py:46</code></td>
+          <td>The first real submission would 400 for most accounts</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <div class="h">What already works and should be kept</div>
+    <p>
+      The messaging system is complete and good: conversations, participants, messages,
+      attachments with presigned two-phase upload, unread high-water marks, and a
+      <code>send_message</code> that already dispatches notifications and email. The
+      application flow should <em>use</em> it, not grow a parallel inbox.
+    </p>
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────── PART 1 -->
+<div class="part">
+  <div class="tag">Part one</div>
+  <h2>The reference, and where we leave it</h2>
+  <p>
+    Airbnb's request-to-book is the closest working model and worth copying in shape. It
+    is also solving a materially different problem, and four of those differences change
+    the design rather than decorate it.
+  </p>
+</div>
+
+<section id="reference">
+  <h3>Same shape</h3>
+  <ul>
+    <li>A request carries dates, a short message, and an identity that has already been verified.</li>
+    <li>Sending it opens a thread automatically. The thread is the record of the negotiation.</li>
+    <li>The host sees a structured summary at the top of that thread, not a wall of profile fields.</li>
+    <li>The exact address is released on acceptance, never before.</li>
+    <li>Requests expire. An unanswered one does not sit forever pretending to be live.</li>
+  </ul>
+
+  <h3>Four differences that change the design</h3>
+  <div class="cards">
+    <div class="card">
+      <div class="n">01 · It is a selection, not a sale</div>
+      <p>
+        A host with a free night accepts the first acceptable guest. An owner with one unit
+        is <em>choosing between</em> applicants, often over days. So our statuses need a real
+        <code>waitlisted</code>, approving one applicant has to do something to the others,
+        and "pending" has to distinguish unseen from under consideration.
+      </p>
+    </div>
+    <div class="card">
+      <div class="n">02 · No money changes hands</div>
+      <p>
+        Airbnb pre-authorises a card, which filters out unserious requests for free. We have
+        no such filter, so spam control has to be explicit: rate limits, a cooldown after a
+        decline, and a cap on open applications.
+      </p>
+    </div>
+    <div class="card">
+      <div class="n">03 · Documents are the substance</div>
+      <p>
+        Nobody sends a payslip to book a weekend. A tenancy turns on income, references and
+        sometimes a guarantor. That makes document exchange a first-class part of the flow —
+        and makes <em>consent per document</em> a requirement rather than a nicety.
+      </p>
+    </div>
+    <div class="card">
+      <div class="n">04 · Housing is a protected transaction</div>
+      <p>
+        Choosing a guest for two nights and choosing who gets a home are not the same act in
+        law. Ontario's Human Rights Code governs the second. Fields that are harmless on a
+        travel profile become a discrimination surface on a tenancy application — see
+        <a href="#owner-sees">Part 4</a>.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────── PART 2 -->
+<div class="part">
+  <div class="tag">Part two</div>
+  <h2>The process</h2>
+  <p>
+    One submission, one application record, one conversation, one structured card inside it.
+    Everything else is a transition on that record.
+  </p>
+</div>
+
+<section id="process">
+  <h3>The happy path, step by step</h3>
+
+  <div class="flow">
+    <div class="step">
+      <div class="num">01</div>
+      <div class="body">
+        <div class="who">Renter · listing page</div>
+        <h4>Presses Apply</h4>
+        <p>
+          Signed out, this opens auth first — an application with nobody's name on it is not
+          an application. Signed in with an incomplete profile, the missing fields are asked
+          <em>here</em>, inline, rather than bouncing them to a profile page. The funnel dies
+          at every redirect.
+        </p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">02</div>
+      <div class="body">
+        <div class="who">Renter · apply sheet</div>
+        <h4>Confirms three things and writes one</h4>
+        <p>
+          Move-in date, lease length, and who is moving in. Then a free-text note to the
+          owner. Nothing else: every additional field on this screen is a percentage of
+          applications that never get sent.
+        </p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">03</div>
+      <div class="body">
+        <div class="who">Server · one transaction</div>
+        <h4>Creates the application, the thread, and the first message</h4>
+        <p>
+          <code>Application</code> row at <code>submitted</code>; a conversation scoped to
+          <em>this renter, this owner, this property</em>; an application card pinned to it;
+          and the renter's note posted as the first message from the renter. All four commit
+          together or none of them do — an application with no thread is a dead end, and a
+          thread with no application is a mystery.
+        </p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">04</div>
+      <div class="body">
+        <div class="who">Owner · notification + email</div>
+        <h4>Is told, and can reply without deciding</h4>
+        <p>
+          The notification links to the thread, not to a decision screen. The owner's first
+          action is usually a question, and today the product forces them to approve before
+          they can ask it.
+        </p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">05</div>
+      <div class="body">
+        <div class="who">Owner · thread</div>
+        <h4>Opens it — which the renter can see</h4>
+        <p>
+          <code>viewed_at</code> is stamped. The renter's status moves from "Sent" to "Being
+          reviewed". This is the single most requested thing in every rental product and we
+          currently guess at it client-side.
+        </p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">06</div>
+      <div class="body">
+        <div class="who">Owner · thread</div>
+        <h4>May request documents</h4>
+        <p>
+          From a short allowed list. The renter grants or refuses per document; a refusal is
+          visible as a refusal rather than as silence. Documents are attached to the
+          application, not pasted into chat, so access can be withdrawn.
+        </p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">07</div>
+      <div class="body">
+        <div class="who">Owner · decision</div>
+        <h4>Approves, waitlists, or declines</h4>
+        <p>
+          On approval: the exact address unlocks for that renter, the lease flow opens, and
+          every other <code>submitted</code> application on that property is nudged — see
+          scenario 8.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <h3>The states</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>State</th><th>Set by</th><th>Means</th><th>New?</th></tr></thead>
+      <tbody>
+        <tr><td><code>submitted</code></td><td>renter</td><td>Sent, nobody has opened it</td><td><span class="pill fix">renamed</span></td></tr>
+        <tr><td><code>viewed</code></td><td>owner opening the thread</td><td>Read, being considered</td><td><span class="pill fix">new</span></td></tr>
+        <tr><td><code>approved</code></td><td>owner</td><td>Yes — address unlocks, lease flow opens</td><td>exists</td></tr>
+        <tr><td><code>waitlisted</code></td><td>owner</td><td>Not now, not no</td><td>exists</td></tr>
+        <tr><td><code>declined</code></td><td>owner</td><td>No</td><td>exists</td></tr>
+        <tr><td><code>withdrawn</code></td><td>renter</td><td>Renter pulled out</td><td><span class="pill fix">new</span></td></tr>
+        <tr><td><code>expired</code></td><td>system</td><td>No owner response inside the window</td><td><span class="pill fix">new</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    <code>pending</code> disappears as a stored value. It currently means two things the
+    renter reads very differently — "sent and unopened" and "read and being decided" — which
+    is exactly why the renter app invents a <code>not-reviewed</code> status of its own. One
+    honest field replaces one client-side guess.
+  </p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────── PART 3 -->
+<div class="part">
+  <div class="tag">Part three</div>
+  <h2>The conversation</h2>
+  <p>
+    Applying opens a thread. What that thread contains is the decision with the longest tail,
+    because a message cannot be unsent and a chat log is trivially forwarded.
+  </p>
+</div>
+
+<section id="thread">
+  <h3>One thread per application, not per pair</h3>
+  <p>
+    <code>Conversation.dm_key</code> is unique on the sorted pair of user ids, so today one
+    renter and one owner can only ever have one thread. An owner with twelve properties and
+    a renter who applies to three would get one conversation carrying three negotiations,
+    and every message would begin with working out which home it is about.
+  </p>
+  <p>
+    The fix is to widen the key rather than remove it: <code>dm_key</code> becomes
+    <code>"&lt;renter&gt;:&lt;owner&gt;:&lt;onboarding&gt;"</code> for application threads,
+    and the conversation carries a nullable <code>onboarding_id</code>. Plain DMs keep the
+    two-part key and the same uniqueness guarantee they have now.
+  </p>
+
+  <h3>A card, not a paragraph</h3>
+  <div class="note warn">
+    <div class="h">The tempting version, and why not</div>
+    <p>
+      The obvious implementation is to post the renter's details as the opening message:
+      <em>"Priya Nair, 24, from India, student at UofT, budget $2,000…"</em>. It is one
+      insert and it renders everywhere for free.
+    </p>
+    <p>
+      It is also permanent, forwardable, and immediately stale. If the renter withdraws, the
+      message stays. If they correct their move-in date, the message still shows the old one.
+      And it hard-codes personal data into a log that no later privacy decision can reach.
+    </p>
+  </div>
+  <p>
+    So the thread carries a <strong>reference</strong> — a pinned card rendered live from the
+    <code>Application</code> row at read time. It updates when the application does,
+    disappears when the application is withdrawn, and honours whatever the field-level rules
+    in <a href="#owner-sees">Part 4</a> say on the day it is read rather than the day it was
+    written.
+  </p>
+  <p>
+    The renter's own note <em>is</em> a real message, posted as them. They wrote it, they
+    meant to send it, and it should sit in the thread like anything else they type.
+  </p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────── PART 4 -->
+<div class="part">
+  <div class="tag">Part four</div>
+  <h2>What the owner may see</h2>
+  <p>
+    The one part of this spec that is not a product preference.
+  </p>
+</div>
+
+<section id="owner-sees">
+  <div class="note bad">
+    <div class="h">The exposure we would be building</div>
+    <p>
+      <code>TenantProfile</code> holds <code>date_of_birth</code>, <code>gender</code>,
+      <code>nationality</code>, <code>country_of_origin</code> and
+      <code>is_international</code>. Ontario's Human Rights Code prohibits refusing housing
+      on grounds including place of origin, citizenship, ethnic origin, creed, sex, gender
+      identity, age, marital status, family status and receipt of public assistance.
+    </p>
+    <p>
+      Auto-sending those fields to an owner at the moment they decide would not merely risk
+      discrimination — it would <em>manufacture the means</em>, and leave Ampl's own
+      timestamped record that we supplied it. The conservative default is that the
+      application card carries none of them, and that is the default this spec takes.
+    </p>
+  </div>
+
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Field</th><th>On the card</th><th>Reasoning</th></tr></thead>
+      <tbody>
+        <tr><td>Name, photo</td><td><span class="pill fix">Yes</span></td><td>They are about to let this person into their home</td></tr>
+        <tr><td>Move-in date, lease length</td><td><span class="pill fix">Yes</span></td><td>The terms being asked for</td></tr>
+        <tr><td>Who is moving in (count)</td><td><span class="pill fix">Yes</span></td><td>Occupancy is a legitimate property question</td></tr>
+        <tr><td>Tenant type (student / professional)</td><td><span class="pill fix">Yes</span></td><td>Already public on the profile and shapes the conversation</td></tr>
+        <tr><td>Identity verified badge</td><td><span class="pill fix">Yes</span></td><td>A boolean we measured; the underlying document is not shared</td></tr>
+        <tr><td>Income verified badge</td><td><span class="pill fix">Yes</span></td><td>A boolean, not a number — see the note below</td></tr>
+        <tr><td>Their written note</td><td><span class="pill fix">Yes</span></td><td>They chose every word of it</td></tr>
+        <tr><td>Exact income figure</td><td><span class="pill open">On request</span></td><td>Permitted in Ontario, but only alongside other factors. Ask, don't broadcast</td></tr>
+        <tr><td>Employment letter, references, guarantor</td><td><span class="pill open">On request</span></td><td>Per-document consent, revocable</td></tr>
+        <tr><td>Date of birth / age</td><td><span class="pill now">No</span></td><td>Protected ground; the verified badge already answers "is this a real adult"</td></tr>
+        <tr><td>Gender, pronouns</td><td><span class="pill now">No</span></td><td>Protected ground, and irrelevant to tenancy</td></tr>
+        <tr><td>Nationality, country of origin, <code>is_international</code></td><td><span class="pill now">No</span></td><td>Protected ground. We collect these to serve newcomers, not to filter them</td></tr>
+        <tr><td>Exact current address</td><td><span class="pill now">No</span></td><td>Symmetry with the rule we apply to the property</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note warn">
+    <div class="h">Not legal advice</div>
+    <p>
+      This table is a conservative engineering default written from the public shape of the
+      Human Rights Code and O. Reg. 290/98, not from counsel. Before launch it needs a
+      lawyer's eye — particularly the income row, where the regulation permits more than this
+      table allows and the safer default may be costing owners a legitimate signal.
+    </p>
+  </div>
+
+  <h3>The match percentage</h3>
+  <p>
+    It is currently <code>85</code> for everybody, written into the insert. Owners are being
+    invited to rank humans by a constant. Three options, in order of preference:
+  </p>
+  <ol>
+    <li><strong>Remove it</strong> until there is something to compute. Nothing is lost that was ever real.</li>
+    <li><strong>Compute it</strong> from facts we hold — budget against rent, move-in against availability, occupancy against bedrooms, preferences against amenities — and show the inputs when it is tapped, the way Atlas shows its pillars.</li>
+    <li>Keep a constant and label it as a placeholder. Not recommended: a number labelled provisional is still a number people sort by.</li>
+  </ol>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────── PART 5 -->
+<div class="part">
+  <div class="tag">Part five</div>
+  <h2>The pressure test</h2>
+  <p>
+    Twelve ways the flow above gets abused, confused or deadlocked, and what it does about
+    each. Every one of these is a decision somebody will otherwise make by accident during
+    implementation.
+  </p>
+</div>
+
+<section id="pressure">
+  <div class="pt">
+
+    <div>
+      <div class="q">1. A renter applies to forty homes in five minutes <span class="pill now">breaks today</span></div>
+      <div class="a">Nothing stops them. Forty owners get a notification from someone who has looked at nothing.</div>
+      <div class="v"><b>Do:</b> cap open applications per renter (suggest 10) and rate-limit submissions (suggest 5/hour). The cap is the better lever — it makes the renter close one before opening another, which is also the honest behaviour.</div>
+    </div>
+
+    <div>
+      <div class="q">2. Owner declines; renter re-applies immediately, repeatedly <span class="pill now">breaks today</span></div>
+      <div class="a">The current guard only blocks re-applying while the previous application is <em>not</em> declined — so a decline is precisely what unlocks the retry.</div>
+      <div class="v"><b>Do:</b> a cooldown after a decline (suggest 30 days) and a hard limit of two applications per renter per property, ever. Re-applying after a decline should require the owner to invite it.</div>
+    </div>
+
+    <div>
+      <div class="q">3. Owner approves two renters for one unit</div>
+      <div class="a">Both see "approved", both see the address, both start a lease flow. One of them is going to be told later that it was a mistake.</div>
+      <div class="v"><b>Do:</b> approving is allowed while the property is listed, but the second approval warns explicitly ("Maya is already approved for this home"). On the <em>first</em> approval, every other <code>submitted</code>/<code>viewed</code> application is auto-moved to <code>waitlisted</code> with a message — never to <code>declined</code>, which is the owner's word to say, not ours.</div>
+    </div>
+
+    <div>
+      <div class="q">4. Owner never responds <span class="pill now">breaks today</span></div>
+      <div class="a">The application stays <code>pending</code> forever. This is the single loudest complaint in every rental marketplace.</div>
+      <div class="v"><b>Do:</b> expire at 14 days with no <code>viewed_at</code>, 30 days with no decision. The renter is told, the slot returns to their cap, and the owner's listing accrues a visible "usually replies in…" that the next renter can read.</div>
+    </div>
+
+    <div>
+      <div class="q">5. The renter changes their mind <span class="pill now">breaks today</span></div>
+      <div class="a">There is no withdraw. Their only options are to ghost the owner or ask them to decline it.</div>
+      <div class="v"><b>Do:</b> <code>withdrawn</code>, from the applications list and the thread. The thread stays — a conversation both people participated in is not ours to delete — but the card collapses to "Withdrawn on 4 Oct".</div>
+    </div>
+
+    <div>
+      <div class="q">6. The property is unlisted or rented while applications are open</div>
+      <div class="a">Applications point at an <code>Onboarding</code> that is no longer in <code>LISTED_STATES</code>. The renter's list still shows them as live.</div>
+      <div class="v"><b>Do:</b> unlisting expires every open application on that property with a distinct reason ("No longer available"), which reads very differently to a renter than silence does.</div>
+    </div>
+
+    <div>
+      <div class="q">7. Two renters apply from one account, or one renter applies twice for a shared flat</div>
+      <div class="a">Occupancy is asked as a count today and nothing links co-applicants.</div>
+      <div class="v"><b>Do:</b> out of scope for v1, and say so. A group application is a real feature with its own consent model; approximating it with a number field is how you end up with a lease naming the wrong people. v1 asks "how many people" and lets the owner ask the rest in the thread.</div>
+    </div>
+
+    <div>
+      <div class="q">8. Owner asks for a SIN, a bank login, or a photo of a passport in chat</div>
+      <div class="a">Nothing prevents it, and the renter has no signal that the request is improper.</div>
+      <div class="v"><b>Do:</b> document requests go through a typed control with an allowed list, and free-text chat carries a quiet, non-blocking hint when it detects those terms. Not a block — an owner asking a reasonable-sounding question should not hit a wall — but the renter should know they are allowed to say no.</div>
+    </div>
+
+    <div>
+      <div class="q">9. Renter applies with an empty profile <span class="pill now">breaks today</span></div>
+      <div class="a">The endpoint 400s with "Complete your student profile before applying", and the renter app has no screen that resolves it.</div>
+      <div class="v"><b>Do:</b> create the <code>TenantProfile</code> lazily at first apply, and gate on a minimum — verified email and a name — rather than on completeness. Ask for the rest inline in the sheet. Profile completeness becomes a badge on the card, not a barrier at the door.</div>
+    </div>
+
+    <div>
+      <div class="q">10. The thread exists but the application is gone</div>
+      <div class="a">Withdrawn or expired applications leave a conversation whose header refers to a record that no longer explains itself.</div>
+      <div class="v"><b>Do:</b> the card renders the terminal state rather than vanishing. A thread whose context disappears is worse than one that says why it ended.</div>
+    </div>
+
+    <div>
+      <div class="q">11. Owner and renter are the same person, or the owner applies to a peer's listing</div>
+      <div class="a">Self-application is already blocked. Owner-as-renter is not, and should not be — an owner is allowed to rent somewhere.</div>
+      <div class="v"><b>Do:</b> keep the self-check, allow the cross-role case, and make sure the thread's participant roles are derived from the <em>application</em> rather than from the account's type. Someone can be an owner in one thread and a renter in the next.</div>
+    </div>
+
+    <div>
+      <div class="q">12. Notification succeeds, message fails — or the reverse</div>
+      <div class="a">Today the approval path wraps <code>send_message</code> in a bare <code>except</code> and continues, so an approval can silently produce no message.</div>
+      <div class="v"><b>Do:</b> for <em>apply</em>, the application, conversation, card and first message are one transaction — a half-created application is not recoverable by the renter and they will simply apply again. Notifications and email stay best-effort and outside it, because a failed email must never lose an application.</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────── PART 6 -->
+<div class="part">
+  <div class="tag">Part six</div>
+  <h2>Schema &amp; API</h2>
+  <p>What has to change to support the above, and nothing beyond it.</p>
+</div>
+
+<section id="schema">
+  <h3>Migrations</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Table</th><th>Change</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><code>applications</code></td><td>+ <code>conversation_id</code> (FK, nullable)</td><td>The thread this application opened</td></tr>
+        <tr><td><code>applications</code></td><td>+ <code>viewed_at</code>, <code>decided_at</code>, <code>expires_at</code></td><td>Statuses that are facts rather than guesses</td></tr>
+        <tr><td><code>applications</code></td><td>+ <code>occupants</code> (int), <code>withdrawn_reason</code></td><td>Asked in the sheet; needed on the card</td></tr>
+        <tr><td><code>applications</code></td><td>drop hardcoded <code>match_percentage</code> default</td><td>See Part 4</td></tr>
+        <tr><td><code>conversations</code></td><td>+ <code>onboarding_id</code> (FK, nullable)</td><td>A thread can be about a property</td></tr>
+        <tr><td><code>conversations</code></td><td><code>dm_key</code> gains a third segment for application threads</td><td>One thread per application, plain DMs unchanged</td></tr>
+        <tr><td><code>application_documents</code></td><td>+ <code>requested_at</code>, <code>granted_at</code>, <code>refused_at</code></td><td>Consent per document, and a refusal that is visible</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Endpoints</h3>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>Who</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST</code></td><td><code>/tenant/applications</code></td><td>renter</td><td>Creates application + conversation + first message in one transaction. Returns both ids so the client can route straight to the thread</td></tr>
+        <tr><td><code>POST</code></td><td><code>/tenant/applications/{id}/withdraw</code></td><td>renter</td><td><span class="pill fix">new</span></td></tr>
+        <tr><td><code>GET</code></td><td><code>/tenant/applications</code></td><td>renter</td><td>Exists. Gains the new statuses and <code>conversation_id</code></td></tr>
+        <tr><td><code>GET</code></td><td><code>/applications</code></td><td>owner</td><td>Exists. Must stop returning fields Part 4 forbids</td></tr>
+        <tr><td><code>PATCH</code></td><td><code>/applications/{id}/status</code></td><td>owner</td><td>Exists. Gains the cascade in scenario 3 and stamps <code>decided_at</code></td></tr>
+        <tr><td><code>POST</code></td><td><code>/applications/{id}/documents/request</code></td><td>owner</td><td><span class="pill fix">new</span> — typed, allowed list</td></tr>
+        <tr><td><code>POST</code></td><td><code>/applications/{id}/documents/{doc}/grant</code></td><td>renter</td><td><span class="pill fix">new</span> — and <code>/refuse</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The one job</h3>
+  <p>
+    Expiry needs a scheduled task. Celery is already configured and running a worker, so this
+    is a beat task rather than new infrastructure: sweep for <code>viewed_at IS NULL</code>
+    past 14 days and undecided past 30, move them to <code>expired</code>, notify both sides.
+  </p>
+</section>
+
+<!-- ───────────────────────────────────────────────────────────── PART 7 -->
+<div class="part">
+  <div class="tag">Part seven</div>
+  <h2>Open decisions</h2>
+  <p>Six things this spec has taken a position on that are genuinely yours to settle.</p>
+</div>
+
+<section id="open">
+  <ol>
+    <li><strong>The match percentage.</strong> Remove, or compute? Removing ships this week; computing is a real piece of work and needs its own honesty rules.</li>
+    <li><strong>Expiry windows.</strong> 14 days unopened / 30 days undecided are placeholders chosen to feel fair. Real numbers should come from what owners actually do once there is data.</li>
+    <li><strong>The open-application cap.</strong> 10 is a guess. Too low and serious renters hit it in a weekend; too high and it stops being a filter.</li>
+    <li><strong>Income on the card.</strong> Part 4 defaults to a badge, not a figure. Ontario permits more. This is the row most likely to be wrong in the cautious direction.</li>
+    <li><strong>Group applications.</strong> Deferred to v2 here. If shared housing is a launch segment rather than a later one, that changes the data model now rather than later.</li>
+    <li><strong>Does a decline release the address?</strong> No, in this spec. Worth confirming — a renter who visited the property already knows it, and pretending otherwise is theatre.</li>
+  </ol>
+
+  <hr>
+
+  <div class="note good">
+    <div class="h">The smallest version that is honest</div>
+    <p>
+      If only one thing ships: make <em>Apply</em> actually submit, open the thread with the
+      renter's note in it, add <code>viewed_at</code> and <code>withdrawn</code>, and delete
+      the hardcoded match score. That is a working, truthful application flow. Everything
+      else in this document makes it safer and fairer, but that is the part where the product
+      starts existing.
+    </p>
+  </div>
+</section>
+
+<footer>
+  Ampl · application-process.html · companion to onboarding-handoff.html and area-intelligence.html
+</footer>
+
+</main>
+</div>
+</body>
+</html>
